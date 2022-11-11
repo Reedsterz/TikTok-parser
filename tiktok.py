@@ -48,68 +48,7 @@ def parse_participants(conversationId, conn):
 
     return participants
 
-def parse_att(att):
-    if att["nickname"]:
-        print("nickname")
-    elif att["secUID"]:
-        print("secUID")
-
 def parse_message(conn, dict_user, chat_db):
-    c = conn.cursor()
-    c.execute("""
-    select
-    identifier,
-    belongingConversationIdentifier, sender,
-    datetime(localCreatedAt, "unixepoch", "localtime") as timestamp,
-    json_extract(content, '$.text') as message,
-    json_extract(content, '$.tips') as localresponse,
-    CASE
-    	WHEN json_extract(content, '$.text') IS NULL then content
-    END as attachments,
-    CASE
-    	WHEN deleted = 1 THEN "Yes"
-    	WHEN deleted = 0 THEN "No"
-    END as deleted,
-    CASE
-    	WHEN hasRead = 1 THEN "Yes"
-    	WHEN hasRead = 0 THEN "No"
-    END as hasRead
-    from TIMMessageORM
-    """)
-
-    records = c.fetchall()
-    list_message = []
-
-    for record in records:
-        conversationID = record["belongingConversationIdentifier"]
-
-        participants = parse_participants(record["belongingConversationIdentifier"], conn)
-        list_participants = []
-        for participant in participants:
-            list_participants.append(dict_user.get(str(participant), "{} : Unknown".format(str(participant))))
-
-        sender = dict_user.get(record["sender"], "Unknown")
-        timestamp = record["timestamp"]
-        message = record["message"]
-        if record["localresponse"] is not None:
-            message = record["localresponse"]
-
-        deleted = record["deleted"]
-        hasRead = record["hasRead"]
-
-        try:
-            json.loads(record["attachments"])
-            att = "stickers"
-        except:
-            att = ""
-        finally:
-            message_tuple = (conversationID, list_participants, sender, timestamp, message, deleted, hasRead, att)
-            list_message.append(message_tuple)
-            continue
-
-    return list_message
-
-def parse_message2(conn, dict_user, chat_db):
     c = conn.cursor()
     c.execute("""
     select
@@ -233,7 +172,7 @@ def main():
     conn_user = create_conn(user_db)
     dict_user = parse_users(conn_user)
     conn_msg = create_conn(chat_db)
-    list_message = parse_message2(conn_msg, dict_user, chat_db)
+    list_message = parse_message(conn_msg, dict_user, chat_db)
     write_excel(list_message, output_file)
 
 if __name__ == "__main__":
